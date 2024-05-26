@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contingency Races</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(16, 40px); /* 16 columns */
+            grid-template-rows: repeat(8, 40px); /* 8 rows */
+            position: relative;
+        }
+        .square {
+            width: 40px;
+            height: 40px;
+        }
+        .horse {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            position: absolute;
+            z-index: 2;
+            transition: top 0.5s linear, left 0.5s linear; /* Smooth transition for movement */
+        }
+        .red-horse {
+            background-color: red;
+        }
+        .blue-horse {
+            background-color: blue;
+        }
+        .green-horse {
+            background-color: green;
+        }
+        .yellow-horse {
+            background-color: yellow;
+        }
+        .marsh, .asphalt {
+            width: 40px;
+            height: 40px;
+        }
+        .marsh {
+            background-color: #778899;
+        }
+        .asphalt {
+            background-color: #808080;
+        }
+        .path-dot {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            z-index: 1;
+        }
+        .legend {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid black;
+            margin-bottom: 10px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .betting-section {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid black;
+            margin-bottom: 10px;
+        }
+        .betting-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .start-button {
+            position: absolute;
+            top: 150px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid black;
+            cursor: pointer;
+        }
+        .results-section {
+            position: absolute;
+            top: 250px;
+            left: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid black;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="board" id="board"></div>
+    <div class="legend" id="legend"></div>
+    <div class="betting-section" id="betting">
+        <div class="betting-item">
+            <label for="person1">Person 1 bet on:</label>
+            <select id="person1">
+                <option value="red">Red</option>
+                <option value="blue">Blue</option>
+                <option value="green">Green</option>
+                <option value="yellow">Yellow</option>
+            </select>
+        </div>
+        <div class="betting-item">
+            <label for="person2">Person 2 bet on:</label>
+            <select id="person2">
+                <option value="red">Red</option>
+                <option value="blue">Blue</option>
+                <option value="green">Green</option>
+                <option value="yellow">Yellow</option>
+            </select>
+        </div>
+    </div>
+    <button class="start-button" id="startButton">Start Race</button>
+    <div class="results-section" id="results">
+        <h3>Results</h3>
+        <p id="resultMessage"></p>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const board = document.getElementById('board');
+            const legend = document.getElementById('legend');
+            const resultsSection = document.getElementById('results');
+            const resultMessage = document.getElementById('resultMessage');
+            const startButton = document.getElementById('startButton');
+            const rows = 8;
+            const cols = 16;
+            const horseColors = ['red', 'blue', 'green', 'yellow'];
+            const colors = {
+                red: 'red',
+                blue: 'blue',
+                green: 'green',
+                yellow: 'yellow'
+            };
+            const combinedColors = {
+                'redblue': 'purple',
+                'redgreen': 'brown',
+                'redyellow': 'orange',
+                'bluegreen': 'cyan',
+                'blueyellow': 'lightgreen',
+                'greenyellow': 'olive',
+                'redbluegreen': 'darkgrey',
+                'redblueyellow': 'magenta',
+                'redgreenyellow': 'gold',
+                'bluegreenyellow': 'lightblue',
+                'redbluegreenyellow': 'white'
+            };
+            let terrain = [];
+            let dots = {};
+            let horsePaths = {};
+            let horses = {};
+            let finishedHorses = [];
+
+            function initBoard() {
+                for (let row = 0; row < rows; row++) {
+                    terrain[row] = [];
+                    for (let col = 0; col < cols; col++) {
+                        const square = document.createElement('div');
+                        square.classList.add('square');
+                        const terrainType = Math.random() < 0.5 ? 'marsh' : 'asphalt';
+                        square.classList.add(terrainType);
+                        board.appendChild(square);
+                        terrain[row][col] = terrainType;
+                    }
+                }
+            }
+
+            function initHorses() {
+                let startRow = 1;
+                horseColors.forEach(color => {
+                    const horse = document.createElement('div');
+                    horse.classList.add('horse', `${color}-horse`);
+                    horse.style.top = `${startRow * 40 + 15}px`; // Centered vertically in the square
+                    horse.style.left = '15px'; // Centered horizontally in the first column
+                    board.appendChild(horse);
+                    horses[color] = horse;
+                    horsePaths[color] = generatePath(color, startRow);
+                    console.log(`Generated path for ${color} horse:`, horsePaths[color]);
+                    startRow += 2;
+                });
+                console.log('Horse paths:', horsePaths);
+            }
+
+            function generatePath(color, startRow) {
+                let path = [];
+                let currentCol = 0;
+                let currentRow = startRow;
+                let lastDirection = null;
+
+                path.push({ col: currentCol, row: currentRow });
+                drawDot(currentCol, currentRow, color); // Initial dot
+                while (currentCol < cols - 1) {
+                    let direction = getNewDirection(lastDirection, currentRow);
+                    if (direction === 'right') {
+                        currentCol++;
+                    } else if (direction === 'up' && currentRow > 0) {
+                        currentRow--;
+                    } else if (direction === 'down' && currentRow < rows - 1) {
+                        currentRow++;
+                    }
+                    lastDirection = direction;
+                    path.push({ col: currentCol, row: currentRow });
+                    drawDot(currentCol, currentRow, color);
+                }
+                return path;
+            }
+
+            function getNewDirection(lastDirection, currentRow) {
+                let directions = ['right'];
+                if (lastDirection !== 'down' && currentRow > 0) directions.push('up');
+                if (lastDirection !== 'up' && currentRow < rows - 1) directions.push('down');
+                return directions[Math.floor(Math.random() * directions.length)];
+            }
+
+            function drawDot(col, row, color) {
+                const key = `${col},${row}`;
+                const dot = document.createElement('div');
+                dot.classList.add('path-dot');
+                dot.style.left = `${col * 40 + 17.5}px`; // Center of the square
+                dot.style.top = `${row * 40 + 17.5}px`; // Center of the square
+                if (dots[key]) {
+                    dots[key].add(color);
+                    let combinedColorKey = Array.from(dots[key]).sort().join('');
+                    if (combinedColors[combinedColorKey]) {
+                        dot.style.backgroundColor = combinedColors[combinedColorKey];
+                    } else {
+                        // If no predefined combination, mix colors manually
+                        dot.style.backgroundColor = mixColors(Array.from(dots[key]));
+                    }
+                } else {
+                    dot.style.backgroundColor = colors[color];
+                    dots[key] = new Set([color]);
+                }
+                board.appendChild(dot);
+            }
+
+            function mixColors(colorArray) {
+                const colorSum = colorArray.reduce((acc, color) => {
+                    const rgb = hexToRgb(colors[color]);
+                    acc[0] += rgb[0];
+                    acc[1] += rgb[1];
+                    acc[2] += rgb[2];
+                    return acc;
+                }, [0, 0, 0]);
+                const colorCount = colorArray.length;
+                return `rgb(${Math.floor(colorSum[0] / colorCount)}, ${Math.floor(colorSum[1] / colorCount)}, ${Math.floor(colorSum[2] / colorCount)})`;
+            }
+
+            function hexToRgb(hex) {
+                var bigint = parseInt(hex.slice(1), 16);
+                var r = (bigint >> 16) & 255;
+                var g = (bigint >> 8) & 255;
+                var b = bigint & 255;
+                return [r, g, b];
+            }
+
+            function startMovingHorses() {
+                horseColors.forEach(color => {
+                    console.log(`Starting movement for ${color} horse`);
+                    moveHorse(color, 0);
+                });
+            }
+
+            function moveHorse(color, index) {
+                if (horsePaths[color] && index < horsePaths[color].length) {
+                    const pos = horsePaths[color][index];
+                    const horse = horses[color];
+                    console.log(`Moving ${color} horse to: `, pos);
+                    horse.style.left = `${pos.col * 40 + 15}px`;
+                    horse.style.top = `${pos.row * 40 + 15}px`;
+                    let delay = 500;
+
+                    // Adjust speed based on terrain
+                    const terrainType = terrain[pos.row][pos.col];
+                    if (terrainType === 'marsh') {
+                        delay = 800;
+                    } else if (terrainType === 'asphalt') {
+                        delay = 300;
+                    }
+
+                    // Adjust speed based on proximity to other horses
+                    if (isNearOtherHorses(color, pos)) {
+                        delay += 200; // Slow down if near other horses
+                    }
+
+                    setTimeout(() => moveHorse(color, index + 1), delay);
+                } else {
+                    console.log(`Finished moving ${color} horse`);
+                    finishedHorses.push(color);
+                    if (finishedHorses.length === horseColors.length) {
+                        declareWinner();
+                    }
+                }
+            }
+
+            function isNearOtherHorses(currentColor, currentPosition) {
+                return horseColors.some(color => {
+                    if (color !== currentColor) {
+                        const horse = horses[color];
+                        const horsePos = getHorsePosition(horse);
+                        const distance = Math.abs(currentPosition.col - horsePos.col) + Math.abs(currentPosition.row - horsePos.row);
+                        return distance <= 1;
+                    }
+                    return false;
+                });
+            }
+
+            function getHorsePosition(horse) {
+                const left = parseInt(horse.style.left, 10);
+                const top = parseInt(horse.style.top, 10);
+                return {
+                    col: Math.round((left - 15) / 40),
+                    row: Math.round((top - 15) / 40)
+                };
+            }
+
+            function declareWinner() {
+                const person1Bet = document.getElementById('person1').value;
+                const person2Bet = document.getElementById('person2').value;
+
+                const firstHorse = finishedHorses[0];
+                const secondHorse = finishedHorses[1];
+
+                let message = `1st: ${firstHorse}, 2nd: ${secondHorse}<br>`;
+                if (firstHorse === person1Bet) {
+                    message += 'Person 1 wins!<br>';
+                }
+                if (firstHorse === person2Bet) {
+                    message += 'Person 2 uberwins!<br>';
+                } else if (secondHorse === person2Bet) {
+                    message += 'Person 2 wins!<br>';
+                }
+                resultMessage.innerHTML = message;
+                resultsSection.style.display = 'block';
+            }
+
+            function initLegend() {
+                for (const [colors, mixedColor] of Object.entries(combinedColors)) {
+                    const legendItem = document.createElement('div');
+                    legendItem.classList.add('legend-item');
+                    const legendColor = document.createElement('div');
+                    legendColor.classList.add('legend-color');
+                    legendColor.style.backgroundColor = mixedColor;
+                    legendItem.appendChild(legendColor);
+                    const legendText = document.createElement('span');
+                    legendText.textContent = `${colors.split(/(?=[A-Z])/).join(' + ')}`;
+                    legendItem.appendChild(legendText);
+                    legend.appendChild(legendItem);
+                }
+            }
+
+            startButton.addEventListener('click', () => {
+                startButton.style.display = 'none';
+                startMovingHorses();
+            });
+
+            initBoard();
+            initHorses();
+            initLegend();
+        });
+    </script>
+</body>
+</html>
